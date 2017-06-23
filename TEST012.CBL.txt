@@ -1,0 +1,266 @@
+      *****************************************************************
+      * サブシステム :データコンバートテスト　                    *
+      * 機能　　　　 :ＣＯＢＯＬでのＢＩＴ操作　　　　　　        *
+      * 　　　　　　 :可変長・固定長レコード入出力操作　　        *
+      * プログラム　 : TEST012                                      *
+      * 稼働環境　　 :バッチ　　　　　作成開始 __.__.__           *
+      * 作成者　　　 :　　　　　　　　完　　了 __.__.__           *
+      *---------------------------------------------------------------*
+      * 機能・仕様変更記録（変更日：概要）                          *
+      *---------------------------------------------------------------*
+      *  ____.__.__    :                                              *
+      *****************************************************************
+       ID                                                   DIVISION.
+      *****************************************************************
+       PROGRAM-ID                       TEST012.
+      *****************************************************************
+       ENVIRONMENT                                          DIVISION.
+      *****************************************************************
+      *---------------------------------------------------------------*
+       CONFIGURATION                                        SECTION.
+      *---------------------------------------------------------------*
+       SOURCE-COMPUTER.                 IBM370.
+       OBJECT-COMPUTER.                 IBM370.
+      *---------------------------------------------------------------*
+       INPUT-OUTPUT                                         SECTION.
+      *---------------------------------------------------------------*
+       FILE-CONTROL.
+      *---------------------------------------------------------------*
+           SELECT   OPTIONAL
+                    FIX-FILE    ASSIGN  TO  ACFIXFL
+                    ORGANIZATION            SEQUENTIAL
+                    FILE        STATUS      F-STAT.
+      *---------------------------------------------------------------*
+           SELECT   OPTIONAL
+                    VAR-FILE    ASSIGN  TO  ACVARFL
+                    ORGANIZATION            SEQUENTIAL
+                    FILE        STATUS      V-STAT.
+      *****************************************************************
+       DATA                                                 DIVISION.
+      *****************************************************************
+       FILE                                                 SECTION.
+      *---------------------------------------------------------------*
+       FD  FIX-FILE     LABEL   RECORD  IS  STANDARD
+           BLOCK        CONTAINS        0   RECORDS
+           RECORD       CONTAINS        0   CHARACTERS
+           RECORDING    MODE            IS  F.
+       01  FIX-REC.
+           03   FIX-CHAR        OCCURS  10  TO   9999
+                DEPENDING   ON  REC-LEN PIC      X(01).
+      *---------------------------------------------------------------*
+       FD  VAR-FILE     LABEL   RECORD  IS  STANDARD
+           BLOCK        CONTAINS        0   RECORDS
+           RECORD   IS  VARYING 1       TO  80
+           DEPENDING    ON      REC-LEN
+           RECORDING    MODE            IS  V.
+       01  VAR-REC.
+      *    03   VAR-CHAR                PIC      X(80).
+           03   VAR-CHAR        OCCURS  1   TO   80
+                DEPENDING   ON  INP-LEN PIC      X(01).
+      *---------------------------------------------------------------*
+       WORKING-STORAGE                                      SECTION.
+      *---------------------------------------------------------------*
+      *---------------------------------------------------------------*
+      * スイッチ定義
+      *---------------------------------------------------------------*
+       01  SW-REC.
+           03   SW-EOF                  PIC      X(03)   VALUE  SPACE.
+      *---------------------------------------------------------------*
+      * カウンター定義
+      *---------------------------------------------------------------*
+       01  CNT-REC.
+           03   CNT-I                   PIC     S9(04)  COMP.
+           03   CNT-J                   PIC     S9(04)  COMP.
+           03   REC-LEN                 PIC      9(05)  COMP.
+           03   INP-LEN                 PIC      9(05)  COMP    VALUE 0.
+       01  STATUS-REC.
+           03   F-STAT                  PIC      X(02).
+           03   V-STAT                  PIC      X(02).
+           03   S-STAT                  PIC      9(02).
+      *---------------------------------------------------------------*
+      * 保存データ定義
+      *---------------------------------------------------------------*
+       01  TBL-REC.
+           03   TBL-BIT-REC.
+                05  TBL-BIT             PIC      9(01)
+                                        OCCURS   8      TIMES.
+           03   TBL-AB-REC.
+                05  TBL-BEFORE-REC.
+                    07  TBL-BEFORE      PIC      9(01)
+                                        OCCURS   4      TIMES.
+                05  TBL-AFTER-REC.
+                    07  TBL-AFTER       PIC      9(01)
+                                        OCCURS   4      TIMES.
+           03   TBL-WK-REC.
+                05  TBL-WK              PIC      9(01)
+                                        OCCURS   4      TIMES.
+           03   HEX-DATA-REC.
+                05  HEX-DATA            PIC      X(16)
+                    VALUE   '0123456789ABCDEF'.
+           03   HEX-TBL-REC             REDEFINES       HEX-DATA-REC.
+                05  HEX-TBL             PIC      X(01)
+                                        OCCURS   16     TIMES.
+      *---------------------------------------------------------------*
+      * 作業域定義
+      *---------------------------------------------------------------*
+       01  WK-REC.
+           03   X1                      PIC     S9(03)  COMP.
+           03   X2                      PIC     S9(03)  COMP.
+           03   X3                      PIC     S9(03)  COMP.
+       01  CHAR-BINARY.
+           03   CHAR-AREA-REC.
+                05  CHAR-AREA-FILLE     PIC      X(01)  VALUE LOW-VALUE.
+                05  CHAR-AREA           PIC      X(01).
+           03   BINARY-AREA-REC         REDEFINES       CHAR-AREA-REC.
+                05  BINARY-AREA         PIC     S9(03)  COMP.
+       01  DISP-REC.
+           03   FILLER                  PIC      X(09)
+                                        VALUE    'IN-DATA=('.
+           03   DISP-IN                 PIC      X(01).
+           03   FILLER                  PIC      X(07)
+                                        VALUE    '):HEX=('.
+           03   DISP-BEFORE             PIC      X(01).
+           03   DISP-AFTER              PIC      X(01).
+           03   FILLER                  PIC      X(05)
+                                        VALUE    '):X1='.
+           03   DISP-X1                 PIC     -----9.
+           03   FILLER                  PIC      X(09)
+                                        VALUE    ':REC-LEN='.
+           03   DISP-RL                 PIC     -----9.
+           03   FILLER                  PIC      X(09)
+                                        VALUE    ':INP-LEN='.
+           03   DISP-IL                 PIC     -----9.
+      *****************************************************************
+       PROCEDURE                                            DIVISION.
+      *****************************************************************
+           PERFORM                      BEFORE-SYORI.
+           PERFORM                      MAIN-SYORI.
+           PERFORM                      AFTER-SYORI.
+           GOBACK.
+      *---------------------------------------------------------------*
+      *    初期処理
+      *---------------------------------------------------------------*
+       BEFORE-SYORI                                         SECTION.
+           PERFORM                      OPEN-SYORI.
+           MOVE    F-STAT               TO  S-STAT.
+           EVALUATE    S-STAT
+               WHEN    0      PERFORM           FIX-READ
+               WHEN    OTHER
+               MOVE    V-STAT           TO  S-STAT
+               EVALUATE    S-STAT
+                   WHEN    0      MOVE  REC-LEN TO  INP-LEN
+                                  PERFORM       VAR-READ
+                                  MOVE  99      TO  S-STAT
+                   WHEN    OTHER  DISPLAY  'V-STAT=' V-STAT
+                                  MOVE  'ON'    TO  SW-EOF
+               END-EVALUATE
+           END-EVALUATE.
+       BEFORE-SYORI-EXIT.                                   EXIT.
+      *---------------------------------------------------------------*
+      *    ＭＡＩＮ処理
+      *---------------------------------------------------------------*
+       MAIN-SYORI                                           SECTION.
+           PERFORM  TEST    BEFORE      UNTIL   SW-EOF  NOT =   SPACE
+                EVALUATE    S-STAT
+                    WHEN    0
+FFFFFF                      MOVE    FIX-CHAR(1) TO  CHAR-AREA   DISP-IN
+                    WHEN    OTHER
+FFFFFF                      MOVE    VAR-CHAR(1) TO  CHAR-AREA   DISP-IN
+      *                     MOVE    VAR-CHAR    TO  CHAR-AREA   DISP-IN
+                END-EVALUATE
+                MOVE    BINARY-AREA     TO      X1          DISP-X1
+                PERFORM                 BIT-SYORI
+                MOVE    TBL-BIT-REC     TO      TBL-AB-REC
+DEB             DISPLAY                 TBL-BIT-REC
+                MOVE    TBL-AFTER-REC   TO      TBL-WK-REC
+                PERFORM                 HEX-SYORI
+                MOVE    HEX-TBL(X2)     TO      DISP-AFTER
+                MOVE    TBL-BEFORE-REC  TO      TBL-WK-REC
+                PERFORM                 HEX-SYORI
+                MOVE    HEX-TBL(X2)     TO      DISP-BEFORE
+                DISPLAY                 DISP-REC
+                EVALUATE    S-STAT
+                    WHEN    0      PERFORM           FIX-READ
+                    WHEN    OTHER  PERFORM           VAR-READ
+                END-EVALUATE
+           END-PERFORM.
+       MAIN-SYORI-EXIT.                                     EXIT.
+      *---------------------------------------------------------------*
+      *    終了処理
+      *---------------------------------------------------------------*
+       AFTER-SYORI                                          SECTION.
+           PERFORM                  CLOSE-SYORI.
+       AFTER-SYORI-EXIT.                                    EXIT.
+      *---------------------------------------------------------------*
+      *    ＢＩＴ処理
+      *---------------------------------------------------------------*
+       BIT-SYORI                                            SECTION.
+           MOVE     8                   TO      CNT-I.
+           PERFORM  TEST    BEFORE      UNTIL   CNT-I   <   1
+                COMPUTE X2      =   X1          /       2
+                COMPUTE X3      =   X1          -   (X2     *   2)
+                MOVE    X3              TO      TBL-BIT(CNT-I)
+                MOVE    X2              TO      X1
+                COMPUTE CNT-I   =   CNT-I       -       1
+           END-PERFORM.
+       BIT-SYORI-EXIT.                                      EXIT.
+      *---------------------------------------------------------------*
+      *    ＨＥＸ処理
+      *---------------------------------------------------------------*
+       HEX-SYORI                                            SECTION.
+           MOVE     1                   TO      CNT-I.
+           MOVE     4                   TO      CNT-J.
+           MOVE     0                   TO      X2.
+           PERFORM  TEST    BEFORE      UNTIL   CNT-I   >   4
+                EVALUATE    TBL-WK(CNT-I)
+                    WHEN    1       COMPUTE X1  =   2 ** (CNT-J  -   1)
+                                    COMPUTE X2  =   X2      +   X1
+                    WHEN    OTHER   CONTINUE
+                END-EVALUATE
+                COMPUTE CNT-I   =   CNT-I       +       1
+                COMPUTE CNT-J   =   CNT-J       -       1
+           END-PERFORM.
+           COMPUTE  X2          =   X2          +       1.
+       HEX-SYORI-EXIT.                                      EXIT.
+      *---------------------------------------------------------------*
+      *    ＯＰＥＮ処理
+      *---------------------------------------------------------------*
+       OPEN-SYORI                                           SECTION.
+           OPEN     INPUT           FIX-FILE.
+           OPEN     INPUT           VAR-FILE.
+       OPEN-SYORI-EXIT.                                     EXIT.
+      *---------------------------------------------------------------*
+      *    ＦＩＸＥＤ読み込み処理
+      *---------------------------------------------------------------*
+       FIX-READ                                             SECTION.
+           READ     FIX-FILE            AT      END
+                MOVE    'ON'            TO      SW-EOF
+           END-READ.
+           EVALUATE SW-EOF
+            WHEN    SPACE   MOVE    REC-LEN     TO  DISP-RL
+            WHEN    OTHER   CONTINUE
+           END-EVALUATE.
+       FIX-READ-EXIT.                                       EXIT.
+      *---------------------------------------------------------------*
+      *    ＶＡＲ読み込み処理
+      *---------------------------------------------------------------*
+       VAR-READ                                             SECTION.
+           READ     VAR-FILE            AT      END
+                MOVE    'ON'            TO      SW-EOF
+           END-READ.
+           DISPLAY  'READ:V-STAT=' V-STAT
+           EVALUATE SW-EOF
+            WHEN    SPACE   MOVE    REC-LEN     TO  DISP-RL
+            WHEN    OTHER   CONTINUE
+           END-EVALUATE.
+       VAR-READ-EXIT.                                       EXIT.
+      *---------------------------------------------------------------*
+      *    ＣＬＯＳＥ処理
+      *---------------------------------------------------------------*
+       CLOSE-SYORI                                          SECTION.
+           CLOSE                    FIX-FILE.
+           CLOSE                    VAR-FILE.
+       CLOSE-SYORI-EXIT.                                    EXIT.
+      *****************************************************************
+      *            PROGRAM             END !!!!!                      *
+      *****************************************************************
